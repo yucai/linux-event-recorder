@@ -1,0 +1,58 @@
+#!/usr/bin/python
+import sys, re
+
+dev_white_list = ["mouse", "keyboard", 
+                  "synaptics_rmi4_touchkey", "synaptics_rmi4",
+                  "egalax inc. egalaxtouch exc7200-7368v1.010",
+                  "egalax inc. usb touchcontroller", 
+                  "synps/2 synaptics touchpad",]
+dev = {}
+first_time = 1
+
+try:
+    f = open(sys.argv[1])
+except:
+    f = False
+
+if f:
+    print "#processed"
+    for l in f.readlines():
+        if len(l) > 0 and l[0] == '#':
+            continue
+
+        if len(l) > 0 and l[0] == '/':
+            # /dev/input/event6: Dell Dell USB Keyboard
+            l_dev = re.split('\s*:\s*', l.strip())
+            for i, d in enumerate(dev_white_list):
+                found = False
+                if i <= 1 and l_dev[1].lower().strip().find(d) != -1:
+                    dev[l_dev[0]] = i
+                    found = True
+                elif i > 1 and l_dev[1].lower().strip() == d:
+                    dev[l_dev[0]] = i
+                    found = True
+
+                if found == True:
+                    print "#[%s] %s: %s" % (dev[l_dev[0]], l_dev[0], l_dev[1])
+                    break
+
+        if len(l) > 0 and l[0] == '[':
+            # [1379033129.790306], /dev/input/event6, 0004 0004 00070028
+            l_event = re.split('\s*,\s*', l.strip())
+            for dnode in dev.keys():
+                if l_event[1].find(dnode) != -1:
+                    m = re.match("\[(\s*\d+).(\d+)]", l_event[0].strip())
+                    new_t = m.groups()
+                    if first_time:
+                        delay = 0
+                        first_time = 0
+                    else:
+                        delay = (int(new_t[0]) - int(old_t[0])) * 1000000 + \
+                                (int(new_t[1]) - int(old_t[1]))
+                        if delay < 0:
+                            delay = 0
+                    old_t = new_t
+                    print "%s %s %s" % (dev[l_event[1]], l_event[2], delay)
+                    break
+
+    f.close()
